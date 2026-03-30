@@ -1,68 +1,122 @@
-pipeline{
-
+pipeline
+{
     agent any
 
-    stages{
+    tools{
+        maven 'maven'
+        }
 
-        stage("build"){
-            steps{
-                echo("build the project")
+    stages
+    {
+        stage('Build')
+        {
+            steps
+            {
+                 git 'https://github.com/jglick/simple-maven-project-with-tests.git'
+                 bat "mvn -Dmaven.test.failure.ignore=true clean package"
+            }
+            post
+            {
+                success
+                {
+                    junit '**/target/surefire-reports/TEST-*.xml'
+                    archiveArtifacts 'target/*.jar'
+                }
             }
         }
 
-        stage("Run Unit test"){
+
+        stage("Deploy to Dev"){
             steps{
-                echo("run UTs")
+                echo("deploy to Dev")
             }
         }
 
-        stage("Run Integration test"){
-            steps{
-                echo("run ITs")
+        stage('Sanity API Automation Test on DEV') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    echo("Sanity API Automation Test on DEV")
+
+                }
             }
         }
 
-        stage("Deploy to dev"){
-            steps{
-                echo("deploy to dev")
-            }
-        }
+
 
         stage("Deploy to QA"){
             steps{
-                echo("deploy to QA")
+                echo("deploy to qa done")
             }
         }
 
-        stage("Run regression API test cases on QA"){
-            steps{
-                echo("Run API test cases on QA")
+
+
+        stage('Regression API Automation Tests on QA') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    git 'https://github.com/BikramChatterjee9/APINew.git'
+                    bat "mvn clean test -Dsurefire.suiteXmlFiles=src/test/resources/xml/regression.xml"
+
+                }
             }
         }
 
-        stage("Deploy to stage"){
-            steps{
-                echo("deploy to stage")
+
+        stage('Publish Allure Reports') {
+           steps {
+                script {
+                    allure([
+                        includeProperties: false,
+                        jdk: '',
+                        properties: [],
+                        reportBuildPolicy: 'ALWAYS',
+                        results: [[path: '/allure-results']]
+                    ])
+                }
             }
         }
 
-        stage("Run sanity API test cases on Stage"){
+
+        stage('Publish ChainTest Report'){
             steps{
-                echo("Run API sanity test cases on Stage")
+                     publishHTML([allowMissing: false,
+                                  alwaysLinkToLastBuild: false,
+                                  keepAll: true,
+                                  reportDir: 'target/chaintest',
+                                  reportFiles: 'Index.html',
+                                  reportName: 'HTML API Regression ChainTest Report',
+                                  reportTitles: ''])
             }
         }
 
-        stage("Deploy to UAT"){
+        stage("Deploy to Stage"){
             steps{
-                echo("deploy to UAT")
+                echo("deploy to Stage")
             }
         }
 
-        stage("Run UAT API test cases on UAT"){
-            steps{
-                echo("Run API UAT test cases on UAT")
+        stage('Sanity API Automation Test on Stage') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    echo("Sanity API Automation Test on Stage")
+
+                }
             }
         }
+
+
+        stage('Publish sanity ChainTest Report'){
+            steps{
+                     publishHTML([allowMissing: false,
+                                  alwaysLinkToLastBuild: false,
+                                  keepAll: true,
+                                  reportDir: 'target/chaintest',
+                                  reportFiles: 'Index.html',
+                                  reportName: 'HTML API Sanity ChainTest Report',
+                                  reportTitles: ''])
+            }
+        }
+
 
         stage("Deploy to PROD"){
             steps{
@@ -70,9 +124,15 @@ pipeline{
             }
         }
 
+        stage('Sanity API Automation Test on PROD') {
+            steps {
+                catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                    echo("Sanity API Automation Test on Stage")
+
+                }
+            }
+        }
 
 
     }
-
-
 }
